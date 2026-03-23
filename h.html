@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+    <title>Visual Studio Web Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/tomorrow-night-bright.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.css"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closetag.min.js"></script>
+    <style>
+        :root {
+            --activity-bg: #333333;
+            --sidebar-bg: #252526;
+            --editor-bg: #1e1e1e;
+            --tabs-bg: #2d2d2d;
+            --tab-active: #1e1e1e;
+            --accent: #007acc;
+            --text: #cccccc;
+            --border: #3c3c3c;
+            --success: #28a745;
+        }
+
+        * { box-sizing: border-box; }
+        body { margin: 0; display: flex; height: 100vh; width: 100vw; font-family: 'Segoe UI', sans-serif; background: var(--editor-bg); color: var(--text); overflow: hidden; }
+
+        .activity-bar { width: 48px; background: var(--activity-bg); display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 20px; flex-shrink: 0; }
+        .activity-icon { font-size: 20px; opacity: 0.5; cursor: pointer; transition: 0.2s; padding: 5px; }
+        .activity-icon.active { opacity: 1; border-left: 2px solid white; }
+
+        .sidebar { width: 220px; background: var(--sidebar-bg); display: flex; flex-direction: column; border-right: 1px solid #000; flex-shrink: 0; }
+        .sidebar-header { padding: 12px; font-size: 11px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; color: #aaa; }
+        .file-list { flex: 1; overflow-y: auto; }
+        .file-item { padding: 6px 15px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; transition: 0.1s; }
+        .file-item:hover { background: #2a2d2e; }
+        .file-item.active { background: #37373d; color: white; }
+
+        .main-editor { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; }
+        .tabs-container { height: 35px; background: var(--tabs-bg); display: flex; overflow-x: auto; scrollbar-width: none; }
+        .tabs-container::-webkit-scrollbar { display: none; }
+        
+        .tab { min-width: 120px; padding: 0 12px; background: var(--tabs-bg); display: flex; align-items: center; justify-content: space-between; font-size: 12px; border-right: 1px solid #1e1e1e; cursor: pointer; color: #969696; }
+        .tab.active { background: var(--tab-active); color: white; border-top: 1px solid var(--accent); }
+        .tab-close { margin-left: 8px; padding: 2px 5px; border-radius: 3px; }
+        .tab-close:hover { background: #444; }
+
+        .toolbar { height: 45px; background: var(--editor-bg); display: flex; align-items: center; padding: 0 15px; gap: 8px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+        .toolbar input[type="text"] { background: #3c3c3c; border: 1px solid #555; color: white; padding: 5px 10px; font-size: 12px; border-radius: 3px; width: 140px; outline: none; }
+
+        .content-body { flex: 1; display: flex; overflow: hidden; position: relative; }
+        .editor-container { flex: 1; height: 100%; display: flex; flex-direction: column; border-right: 1px solid var(--border); min-width: 0; }
+        .CodeMirror { height: 100% !important; flex-grow: 1; font-family: 'Consolas', monospace; font-size: 14px; }
+        
+        .preview-container { flex: 1; background: white; height: 100%; min-width: 0; transition: 0.3s; position: relative; }
+        .preview-container.hidden { display: none; }
+        iframe { width: 100%; height: 100%; border: none; background: white; }
+
+        .btn { background: #3c3c3c; color: white; border: 1px solid #555; padding: 5px 10px; font-size: 11px; cursor: pointer; border-radius: 3px; white-space: nowrap; transition: 0.2s; }
+        .btn:hover { background: #4d4d4d; }
+        .btn-primary { background: var(--accent); border-color: var(--accent); }
+        .btn-data { background: var(--success); border-color: var(--success); }
+        .btn-data:hover { background: #218838; }
+
+        .toggle-container { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #aaa; margin-left: 5px; }
+        
+        .status-bar { height: 22px; background: var(--accent); color: white; display: flex; align-items: center; padding: 0 10px; font-size: 11px; justify-content: space-between; flex-shrink: 0; }
+    </style>
+</head>
+<body>
+
+    <div class="activity-bar">
+        <div class="activity-icon active">📄</div>
+        <div class="activity-icon">🔍</div>
+        <div class="activity-icon" style="margin-top:auto; margin-bottom: 10px;">⚙️</div>
+    </div>
+
+    <div class="sidebar">
+        <div class="sidebar-header">Explorer</div>
+        <div id="fileList" class="file-list"></div>
+        <div style="padding: 10px; border-top: 1px solid var(--border);">
+            <button class="btn btn-primary" onclick="createNewFile()" style="width:100%">+ New File</button>
+        </div>
+    </div>
+
+    <div class="main-editor">
+        <div class="tabs-container" id="tabs"></div>
+        
+        <div class="toolbar">
+            <input type="text" id="fileNameInput" placeholder="filename.html" oninput="updateFileName()">
+            
+            <div class="toggle-container">
+                <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()"> 
+                <label for="autoRefresh">Auto</label>
+            </div>
+            
+            <button id="manualRefresh" class="btn" style="display:none" onclick="renderPreview()">🔄 Refresh</button>
+            <button class="btn" onclick="togglePreview()">Hide Preview</button>
+            
+            <div style="width: 1px; height: 20px; background: #555; margin: 0 2px;"></div>
+            
+            <button class="btn btn-data" onclick="copyDataBase64()" title="Copy as data:text/html;base64">Export to Data</button>
+            <button class="btn" onclick="exportFile()">Download</button>
+            <button class="btn" onclick="fullscreen()">Pop Out</button>
+            
+            <div style="width: 1px; height: 20px; background: #555; margin: 0 2px;"></div>
+            
+            <button class="btn" onclick="backupAll()">Export JSON</button>
+            <button class="btn" onclick="triggerImport()">Import JSON</button>
+            <input type="file" id="importInput" style="display:none" accept=".json" onchange="handleImport(event)">
+        </div>
+
+        <div class="content-body">
+            <div class="editor-container">
+                <textarea id="real-editor"></textarea>
+            </div>
+            <div class="preview-container" id="preview-box">
+                <iframe id="live-preview"></iframe>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div id="status-text">Ready</div>
+            <div id="file-info">Line 1, Col 1</div>
+        </div>
+    </div>
+
+    <script>
+        let files = JSON.parse(localStorage.getItem('vscode_files')) || [
+            { id: 1, name: 'index.html', content: '<h1>Hello VS Code</h1>', active: true }
+        ];
+        let activeIdx = files.findIndex(f => f.active);
+        if (activeIdx === -1) activeIdx = 0;
+        
+        let cm;
+        let isAutoRefresh = true;
+
+        function init() {
+            cm = CodeMirror.fromTextArea(document.getElementById('real-editor'), {
+                mode: "htmlmixed",
+                theme: "tomorrow-night-bright",
+                lineNumbers: true,
+                autoCloseTags: true,
+                tabSize: 4,
+                indentUnit: 4,
+                lineWrapping: true
+            });
+
+            cm.on('change', () => {
+                files[activeIdx].content = cm.getValue();
+                save();
+                if(isAutoRefresh) debouncedPreview();
+            });
+
+            cm.on('cursorActivity', () => {
+                const pos = cm.getDoc().getCursor();
+                document.getElementById('file-info').innerText = `Line ${pos.line + 1}, Col ${pos.ch + 1}`;
+            });
+
+            refreshUI();
+        }
+
+        let timeout;
+        function debouncedPreview() {
+            clearTimeout(timeout);
+            timeout = setTimeout(renderPreview, 300);
+        }
+
+        function toggleAutoRefresh() {
+            isAutoRefresh = document.getElementById('autoRefresh').checked;
+            document.getElementById('manualRefresh').style.display = isAutoRefresh ? 'none' : 'inline-block';
+            if(isAutoRefresh) renderPreview();
+        }
+
+        function refreshUI() {
+            renderSidebar();
+            renderTabs();
+            loadActiveFile();
+            renderPreview();
+        }
+
+        function renderSidebar() {
+            const list = document.getElementById('fileList');
+            list.innerHTML = '';
+            files.forEach((file, i) => {
+                const item = document.createElement('div');
+                item.className = `file-item ${i === activeIdx ? 'active' : ''}`;
+                item.innerHTML = `<span>📄 ${file.name}</span>`;
+                item.onclick = () => switchFile(i);
+                list.appendChild(item);
+            });
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabs');
+            container.innerHTML = '';
+            files.forEach((file, i) => {
+                const tab = document.createElement('div');
+                tab.className = `tab ${i === activeIdx ? 'active' : ''}`;
+                tab.innerHTML = `<span>${file.name}</span> <span class="tab-close" onclick="deleteFile(${i}, event)">✕</span>`;
+                tab.onclick = () => switchFile(i);
+                container.appendChild(tab);
+            });
+        }
+
+        function loadActiveFile() {
+            const file = files[activeIdx];
+            cm.setValue(file.content || '');
+            document.getElementById('fileNameInput').value = file.name;
+        }
+
+        function switchFile(index) {
+            files[activeIdx].active = false;
+            activeIdx = index;
+            files[activeIdx].active = true;
+            refreshUI();
+        }
+
+        function createNewFile() {
+            files.forEach(f => f.active = false);
+            const newFile = { id: Date.now(), name: 'new.html', content: '', active: true };
+            files.push(newFile);
+            activeIdx = files.length - 1;
+            save();
+            refreshUI();
+        }
+
+        function updateFileName() {
+            files[activeIdx].name = document.getElementById('fileNameInput').value;
+            renderSidebar();
+            renderTabs();
+            save();
+        }
+
+        function renderPreview() {
+            const iframe = document.getElementById('live-preview');
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(files[activeIdx].content);
+            doc.close();
+            updateStatus("Preview Updated");
+        }
+
+        function togglePreview() {
+            const preview = document.getElementById('preview-box');
+            preview.classList.toggle('hidden');
+            if(!preview.classList.contains('hidden')) renderPreview();
+        }
+
+        function save() {
+            localStorage.setItem('vscode_files', JSON.stringify(files));
+        }
+
+        function updateStatus(text) {
+            const s = document.getElementById('status-text');
+            s.innerText = text;
+            setTimeout(() => s.innerText = "Ready", 2000);
+        }
+
+        // --- EXPORT TO DATA (BASE64) ---
+        function copyDataBase64() {
+            try {
+                const code = cm.getValue();
+                // Using btoa for base64 encoding, handling unicode characters
+                const base64 = btoa(unescape(encodeURIComponent(code)));
+                const dataUrl = `data:text/html;base64,${base64}`;
+                
+                navigator.clipboard.writeText(dataUrl).then(() => {
+                    alert("Base64 Data URL copied to clipboard!");
+                    updateStatus("Copied Data URL");
+                });
+            } catch (e) {
+                alert("Error generating Base64. Check code for invalid characters.");
+            }
+        }
+
+        function backupAll() {
+            const data = JSON.stringify(files, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'workspace_backup.json';
+            a.click();
+        }
+
+        function triggerImport() {
+            document.getElementById('importInput').click();
+        }
+
+        function handleImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        if (confirm("Replace current workspace with backup? Cancel to merge instead.")) {
+                            files = importedData;
+                        } else {
+                            files = [...files, ...importedData];
+                        }
+                        activeIdx = files.findIndex(f => f.active);
+                        if (activeIdx === -1) activeIdx = 0;
+                        files[activeIdx].active = true;
+                        save();
+                        refreshUI();
+                    }
+                } catch (err) { alert("Invalid JSON file."); }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportFile() {
+            const blob = new Blob([cm.getValue()], { type: 'text/html' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = files[activeIdx].name;
+            a.click();
+        }
+
+        function fullscreen() {
+            const win = window.open('about:blank');
+            win.document.write(cm.getValue());
+            win.document.close();
+        }
+
+        function deleteFile(index, event) {
+            event.stopPropagation();
+            if (files.length === 1) return;
+            files.splice(index, 1);
+            activeIdx = 0;
+            files[0].active = true;
+            save();
+            refreshUI();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
