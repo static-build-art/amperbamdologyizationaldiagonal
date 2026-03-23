@@ -40,6 +40,7 @@
         .controls button { background: #333; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 2px; font-size: 11px; }
         .controls button:hover { background: #444; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -49,12 +50,15 @@
 
     <div id="actual-hub">
         <div id="sidebar">
-            <input type="file" id="folder-input" webkitdirectory directory multiple>
-            <input type="text" id="search" placeholder="Search library...">
-            <ul id="game-list">
-                <li style="color:#666; justify-content: center; font-size: 12px;">📂 Load "items" folder</li>
-            </ul>
-        </div>
+    <input type="file" id="folder-input" webkitdirectory directory multiple>
+    <div class="controls" style="border-bottom: 1px solid #333;">
+        <button id="export-favs" style="width: 100%; margin: 5px; background: #2e7d32;">Export Favorites (.zip)</button>
+    </div>
+    <input type="text" id="search" placeholder="Search library...">
+    <ul id="game-list">
+        <li style="color:#666; justify-content: center; font-size: 12px;">📂 Load "items" folder</li>
+    </ul>
+</div>
         <div style="display: flex; flex-direction: column; flex-grow: 1;">
             <div class="controls">
                 <button onclick="document.getElementById('game-frame').requestFullscreen()">Fullscreen</button>
@@ -72,7 +76,7 @@
     const searchInput = document.getElementById('search');
     const gameFrame = document.getElementById('game-frame');
     const popoutBtn = document.getElementById('popout-btn');
-
+const exportBtn = document.getElementById('export-favs');
     let allFiles = [];
     let favorites = JSON.parse(localStorage.getItem('hub_favs')) || [];
     let currentBlobUrl = null;
