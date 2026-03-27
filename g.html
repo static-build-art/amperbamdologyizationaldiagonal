@@ -84,6 +84,7 @@
             <button class="btn" onclick="showPage('page-playables')">Playables</button>
             <button class="btn" onclick="showPage('page-editor')">HTML Editor</button>
             <button class="btn" style="background: #a32a2a;" onclick="showPage('page-prox')">Pro-X</button>
+			<button class="btn" style="background:orange;" onclick="console.log(undefinedVariable)">Test Error</button>
         </div>
     </div>
 
@@ -109,13 +110,24 @@
         </div>
         <div class="view-body">
             <div class="sidebar">
-                <input type="text" id="p-search" placeholder="Search..." style="padding:8px; background:#000; color:white; border:1px solid #444;" oninput="renderPlayList()">
-                <div id="p-list" class="scroll-list"></div>
-                <button class="btn" onclick="document.getElementById('p-import').click()">+ Import Files</button>
-                <input type="file" id="p-import" multiple class="hidden">
-                <button class="btn" style="font-size: 10px; background: #444;" onclick="document.getElementById('p-folder-import').click()">+ Import Folder</button>
-                <input type="file" id="p-folder-import" webkitdirectory directory multiple class="hidden">
-            </div>
+    <input type="text" id="p-search" placeholder="Search..." style="padding:8px; background:#000; color:white; border:1px solid #444;" oninput="renderPlayList()">
+    
+    <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 4px;">
+        <label style="font-size: 12px; display: block; margin-bottom: 5px;">Master Volume</label>
+        <input type="range" id="p-volume" min="0" max="1" step="0.1" value="0.5" 
+       style="width: 100%; cursor: pointer;" 
+       oninput="updateVolumeLive(this.value)">
+        <div style="font-size: 10px; color: #888; margin-top: 5px; text-align: center;">
+            Volume may not work for certain games
+        </div>
+    </div>
+
+    <div id="p-list" class="scroll-list" style="margin-top:10px;"></div>
+    <button class="btn" onclick="document.getElementById('p-import').click()">+ Import Files</button>
+    <input type="file" id="p-import" multiple class="hidden">
+    <button class="btn" style="font-size: 10px; background: #444;" onclick="document.getElementById('p-folder-import').click()">+ Import Folder</button>
+    <input type="file" id="p-folder-import" webkitdirectory directory multiple class="hidden">
+</div>
             <div class="content-area">
                 <div style="display:flex; gap:10px; margin-bottom:10px; justify-content:center;">
                     <button class="btn" onclick="fs('p-frame')">Fullscreen</button>
@@ -160,6 +172,104 @@
     </div>
 
 <script>
+function updateVolumeLive(val) {
+    const frame = document.getElementById('p-frame');
+    if (frame && frame.contentWindow) {
+        // This sends the volume to the iframe WITHOUT reloading it
+        frame.contentWindow.postMessage({ type: 'setVolume', value: val }, '*');
+    }
+}
+// --- ERROR TRACKING SYSTEM ---
+var systemLogs = [];
+
+function addToLog(msg, type = "ERROR") {
+    const list = document.getElementById('error-log-list');
+    const time = new Date().toLocaleTimeString();
+    const color = type === "WARN" ? "#ffcc00" : "#ff4d4d";
+    
+    const logEntry = `<div style="color:${color}; margin-bottom:10px; border-bottom:1px solid #222; padding-bottom:5px;">
+        [${time}] <b>${type}:</b> ${msg}
+    </div>`;
+    
+    systemLogs.push(logEntry);
+    
+    if (list) {
+        list.innerHTML = systemLogs.join('');
+        // Auto-scroll to bottom of logs
+        const container = document.getElementById('error-console');
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+function clearLogs() {
+    systemLogs = [];
+    const list = document.getElementById('error-log-list');
+    if (list) list.innerHTML = '';
+}
+
+// 1. Capture standard errors (syntax, undefined, etc)
+window.onerror = function(msg, url, line, col, error) {
+    addToLog(`${msg} <br><small>at line ${line} in ${url}</small>`);
+    return false; // Let it still show in the real console too
+};
+
+// 2. Capture Promise rejections (failed fetches/imports)
+window.onunhandledrejection = function(event) {
+    addToLog("Async Error: " + event.reason, "ERROR");
+};
+
+// 3. THE "DEVTOOLS" FIX: Capture manual console.error calls
+const nativeConsoleError = console.error;
+console.error = function(...args) {
+    addToLog(args.join(' '), "ERROR");
+    nativeConsoleError.apply(console, args);
+};
+
+// 4. THE "DEVTOOLS" FIX: Capture manual console.warn calls
+const nativeConsoleWarn = console.warn;
+console.warn = function(...args) {
+    addToLog(args.join(' '), "WARN");
+    nativeConsoleWarn.apply(console, args);
+};
+
+// 5. F9 Toggle Logic
+window.addEventListener('keydown', function(e) {
+    if (e.key === "F9") {
+        e.preventDefault();
+        const menu = document.getElementById('error-console');
+        if (menu) {
+            menu.classList.toggle('hidden');
+        }
+    }
+});
+
+function copyFullLog() {
+    const list = document.getElementById('error-log-list');
+    if (!list || systemLogs.length === 0) {
+        alert("Log is empty!");
+        return;
+    }
+
+    // Convert the HTML entries into plain text for a clean copy
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = systemLogs.join('\n');
+    const plainText = tempDiv.innerText || tempDiv.textContent;
+
+    navigator.clipboard.writeText(plainText).then(() => {
+        // Find the button specifically by looking for the one that says "Copy All"
+        const btns = document.querySelectorAll('#error-console .btn');
+        let copyBtn = Array.from(btns).find(b => b.innerText.includes("Copy"));
+        
+        if (copyBtn) {
+            const originalText = copyBtn.innerText;
+            copyBtn.innerText = "✓ Copied!";
+            setTimeout(() => copyBtn.innerText = originalText, 2000);
+        }
+    }).catch(err => {
+        // This will now show up in your F9 log if it fails!
+        console.error("Manual Copy Failed: ", err);
+    });
+}
   var PRESETS = [
   { name: "10min", url: "https://cdn.jsdelivr.net/gh/static-build-art/art/10min.html" },
   { name: "Eaglercraft Alpha 1.2.6", url: "https://cdn.jsdelivr.net/gh/static-build-art/art/Eaglercraft-Alpha-1.2.6-Offline.html" },
@@ -372,39 +482,154 @@
 
     function save() { localStorage.setItem('gamma_ed_v3', JSON.stringify(edFiles)); }
     
-    function write(id, code) {
-        const f = document.getElementById(id);
-        if (!f) return;
-        const d = f.contentWindow.document;
-        d.open(); d.write(code); d.close();
-    }
+function write(id, code) {
+    const f = document.getElementById(id);
+    if (!f) return;
+
+    const volumeLockScript = `
+    <script>
+        (function() {
+            window._currentVol = 0.5; // Shared volume state
+
+            // LISTEN FOR SLIDER MOVES
+            window.addEventListener('message', (e) => {
+                if (e.data.type === 'setVolume') {
+                    window._currentVol = parseFloat(e.data.value);
+                    // Force update existing tags immediately
+                    document.querySelectorAll('audio, video').forEach(m => m.volume = window._currentVol);
+                }
+            });
+
+            // 1. THE TRAP FOR <AUDIO> AND <VIDEO>
+            // This prevents the game from ever changing the volume property
+            Object.defineProperty(HTMLMediaElement.prototype, 'volume', {
+                get: function() { return this._volume || window._currentVol; },
+                set: function(v) { 
+                    // We ignore 'v' (what the game wants) and use our slider value
+                    this._volume = window._currentVol; 
+                },
+                configurable: true
+            });
+
+            // 2. THE TRAP FOR WEB AUDIO (AudioContext)
+            const RawAudioContext = window.AudioContext || window.webkitAudioContext;
+            if (RawAudioContext) {
+                window.AudioContext = window.webkitAudioContext = function() {
+                    const ctx = new RawAudioContext();
+                    const masterGain = ctx.createGain();
+                    
+                    // Constantly force the master gain to match our slider
+                    setInterval(() => {
+                        if (masterGain.gain.value !== window._currentVol) {
+                            masterGain.gain.value = window._currentVol;
+                        }
+                    }, 50);
+
+                    // Redirect all game audio through our locked gain node
+                    masterGain.connect(ctx.destination);
+                    Object.defineProperty(ctx, 'destination', {
+                        value: masterGain,
+                        writable: false
+                    });
+                    return ctx;
+                };
+            }
+        })();
+    <\/script>`;
+
+    const d = f.contentWindow.document;
+    d.open();
+    d.write(volumeLockScript + code);
+    d.close();
+}
     
     function fs(id) { document.getElementById(id).requestFullscreen(); }
     function copyB64() { navigator.clipboard.writeText("data:text/html;base64," + document.getElementById('b64-str').innerText); alert("Copied!"); }
 
-    function popOut(mode) {
-        const win = window.open('about:blank');
-        const code = (mode === 'ed') ? edFiles[activeEdIdx].content : currentPlayContent;
-        win.document.write(code);
-        const s = win.document.createElement('script');
-        s.text = `
-            var b = document.createElement('button');
-            b.innerText = 'Refresh';
-            b.style = 'position:fixed;bottom:20px;right:20px;z-index:999;padding:10px;background:#1a506b;color:#fff;border:none;border-radius:5px;cursor:pointer;';
-            b.onclick = () => { window.opener.postMessage({type:'req', mode:'${mode}'}, '*'); };
-            document.body.appendChild(b);
-            window.onkeydown = (e) => { if(e.key.toLowerCase() === 'm') b.style.display = b.style.display === 'none' ? 'block' : 'none'; };
-            window.addEventListener('message', (e) => { if(e.data.type === 'upd') { document.open(); document.write(e.data.code); document.close(); } });
-        `;
-        win.document.body.appendChild(s);
-        win.document.close();
-        window.onmessage = (e) => {
-            if(e.data.type === 'req') {
-                const fresh = (e.data.mode === 'ed') ? edFiles[activeEdIdx].content : currentPlayContent;
-                win.postMessage({type:'upd', code: fresh}, '*');
-            }
-        };
-    }
+  function popOut(mode) {
+    const win = window.open('about:blank');
+    const rawCode = (mode === 'ed') ? edFiles[activeEdIdx].content : currentPlayContent;
+    
+    // Safety check: encode to base64 to prevent injection breakage
+    const b64Code = btoa(unescape(encodeURIComponent(rawCode)));
+
+    win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>New Tab</title>
+            <style>
+                body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+                #refresh-btn { 
+                    position: fixed; bottom: 20px; right: 20px; z-index: 9999; 
+                    padding: 10px 15px; background: #1a506b; color: #fff; 
+                    border: none; border-radius: 5px; cursor: pointer; font-family: sans-serif;
+                }
+                .frame-wrapper { width: 100%; height: 100%; }
+                iframe { width: 100%; height: 100%; border: none; background: #fff; }
+            </style>
+        </head>
+        <body>
+            <button id="refresh-btn" onclick="requestRefresh()">Refresh</button>
+            <div id="container" class="frame-wrapper"></div>
+
+            <script>
+                function updateFrame(base64) {
+                    const container = document.getElementById('container');
+                    
+                    // 1. COMPLETELY CLEAR THE OLD IFRAME (Kills old audio/code)
+                    container.innerHTML = ''; 
+                    
+                    // 2. CREATE A FRESH IFRAME ELEMENT
+                    const newFrame = document.createElement('iframe');
+                    container.appendChild(newFrame);
+                    
+                    try {
+                        const decoded = decodeURIComponent(escape(atob(base64)));
+                        const d = newFrame.contentWindow.document;
+                        d.open();
+                        d.write(decoded);
+                        d.close();
+                        newFrame.focus();
+                    } catch(e) {
+                        console.error("Injection failed:", e);
+                    }
+                }
+
+                // Initial Load
+                updateFrame("${b64Code}");
+
+                function requestRefresh() {
+                    window.opener.postMessage({type: 'req', mode: '${mode}'}, '*');
+                }
+
+                window.addEventListener('message', (e) => {
+                    if (e.data.type === 'upd') {
+                        const newB64 = btoa(unescape(encodeURIComponent(e.data.code)));
+                        updateFrame(newB64);
+                    }
+                });
+
+                window.onkeydown = (e) => {
+                    if(e.key.toLowerCase() === 'm') {
+                        const b = document.getElementById('refresh-btn');
+                        b.style.display = b.style.display === 'none' ? 'block' : 'none';
+                    }
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    win.document.close();
+
+    // Gamma Client Side Message Listener (Ensure this is in your main script once)
+    window.onmessage = (e) => {
+        if(e.data.type === 'req') {
+            const fresh = (e.data.mode === 'ed') ? edFiles[activeEdIdx].content : currentPlayContent;
+            win.postMessage({type: 'upd', code: fresh}, '*');
+        }
+    };
+}
 // ====================== STABLE CLOAK - SLOW CYCLING ======================
 let cloak = null;
 let panic = false;
@@ -507,6 +732,18 @@ window.addEventListener('load', () => {
     setRandomSafe();
 });
   window.onbeforeunload = () => "Safety Check";
+ 
 </script>
+<div id="error-console" class="hidden" style="position:fixed; top:50px; left:50px; right:50px; bottom:50px; background:#111; color:#ff4d4d; border:2px solid #a32a2a; z-index:1000000000; padding:20px; overflow-y:auto; font-family:monospace; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #444; padding-bottom:10px;">
+        <b style="font-size:1.5rem;">System Error Log</b>
+        <div>
+            <button class="btn" style="background:#238636; margin-right:10px;" onclick="copyFullLog()">Copy All</button>
+            <button class="btn" style="background:#444; margin-right:10px;" onclick="clearLogs()">Clear</button>
+            <button class="btn" onclick="document.getElementById('error-console').classList.add('hidden')">Close (F9)</button>
+        </div>
+    </div>
+    <div id="error-log-list"></div>
+</div>
 </body>
 </html>
