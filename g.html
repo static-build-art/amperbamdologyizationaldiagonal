@@ -347,7 +347,18 @@ function copyFullLog() {
   { name: "Marble Racer", url: "https://cdn.jsdelivr.net/gh/static-build-art/art/marbleracer.html" }
 ];
     var games = [];
-    var edFiles = JSON.parse(localStorage.getItem('gamma_ed_v3')) || [{name:'index.html', content:'<h1>Editor</h1>'}];
+   // --- CHROMBOOK STORAGE FIX ---
+    var edFiles;
+    try {
+        const saved = localStorage.getItem('gamma_ed_v3');
+        edFiles = saved ? JSON.parse(saved) : [{name:'index.html', content:'<h1>Editor</h1>'}];
+    } catch (e) {
+        // This stops the crash on Chromebooks/Data URLs
+        console.warn("Storage blocked. Using session-only mode.");
+        edFiles = [{name:'index.html', content:'<h1>Editor</h1>'}];
+    }
+
+    var games = [];
     var activeEdIdx = 0;
     var currentPlayContent = "";
 
@@ -480,7 +491,14 @@ function copyFullLog() {
         a.click();
     }
 
-    function save() { localStorage.setItem('gamma_ed_v3', JSON.stringify(edFiles)); }
+    function save() { 
+        try {
+            localStorage.setItem('gamma_ed_v3', JSON.stringify(edFiles)); 
+        } catch (e) {
+            // This prevents the red error box from popping up while you type
+            console.error("Save blocked: LocalStorage is disabled in this environment.");
+        }
+    }
     
 function write(id, code) {
     const f = document.getElementById(id);
